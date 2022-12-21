@@ -28,7 +28,7 @@ type Query struct {
 	Select bson.M
 	Limit  int
 	Skip   int
-	Sort   []string
+	Sort   bson.D
 }
 
 func addConnectionToAndQuery(connectionID string, filterObj bson.M) []bson.M {
@@ -84,7 +84,7 @@ func ODataQuery(connectionID string, query url.Values, object interface{}, colle
 	}
 
 	// Sort
-	var sortFields bson.D
+	var sortFields = bson.D{}
 	if queryMap[parser.OrderBy] != nil {
 		orderBySlice := queryMap[parser.OrderBy].([]parser.OrderItem)
 		for _, item := range orderBySlice {
@@ -92,7 +92,7 @@ func ODataQuery(connectionID string, query url.Values, object interface{}, colle
 			if item.Order == "desc" {
 				order = -1
 			}
-			sortFields = append(sortFields, bson.E{item.Field, order})
+			sortFields = append(sortFields, bson.E{Key: item.Field, Value: order})
 		}
 	}
 
@@ -167,14 +167,15 @@ func GetODataQuery(connectionID string, query url.Values) (Query, error) {
 	odataQuery.Select = selectMap
 
 	// Sort
-	var sortFields []string
+	var sortFields = bson.D{}
 	if queryMap[parser.OrderBy] != nil {
 		orderBySlice := queryMap[parser.OrderBy].([]parser.OrderItem)
 		for _, item := range orderBySlice {
+			order := 1 // asc
 			if item.Order == "desc" {
-				item.Field = "-" + item.Field
+				order = -1
 			}
-			sortFields = append(sortFields, item.Field)
+			sortFields = append(sortFields, bson.E{Key: item.Field, Value: order})
 		}
 	}
 
