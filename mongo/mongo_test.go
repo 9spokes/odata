@@ -7,20 +7,22 @@
 package mongo
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"testing"
 
 	"github.com/pkg/errors"
 
-	"github.com/globalsign/mgo"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var dbhost = "mongodb://localhost:27017/test"
 
 func TestODataQuery(t *testing.T) {
 
-	mainSession, err := mgo.Dial(dbhost)
+	mainSession, err := mongo.Connect(context.Background(), options.Client().ApplyURI(dbhost))
 	if err != nil {
 		t.Errorf("Unable to connect to mongo server on %s", dbhost)
 	}
@@ -31,7 +33,7 @@ func TestODataQuery(t *testing.T) {
 	}
 
 	var object []interface{}
-	collection := mainSession.DB("test").C("tests")
+	collection := mainSession.Database("test").Collection("tests")
 
 	if _, err := ODataQuery("", testURL.Query(), &object, collection); err != nil {
 		t.Errorf("Error: %s", err.Error())
@@ -39,7 +41,7 @@ func TestODataQuery(t *testing.T) {
 }
 func TestODataFilter(t *testing.T) {
 
-	mainSession, err := mgo.Dial(dbhost)
+	mainSession, err := mongo.Connect(context.Background(), options.Client().ApplyURI(dbhost))
 	if err != nil {
 		t.Errorf("Unable to connect to mongo server on %s", dbhost)
 	}
@@ -50,7 +52,7 @@ func TestODataFilter(t *testing.T) {
 	}
 
 	var object []interface{}
-	collection := mainSession.DB("test").C("tests")
+	collection := mainSession.Database("test").Collection("tests")
 
 	if _, err := ODataQuery("", testURL.Query(), &object, collection); err != nil {
 		t.Errorf("Error: %s", err.Error())
@@ -59,7 +61,7 @@ func TestODataFilter(t *testing.T) {
 
 func TestODataFunctions(t *testing.T) {
 
-	mainSession, err := mgo.Dial(dbhost)
+	mainSession, err := mongo.Connect(context.Background(), options.Client().ApplyURI(dbhost))
 	if err != nil {
 		t.Errorf("Unable to connect to mongo server on %s", dbhost)
 	}
@@ -70,7 +72,7 @@ func TestODataFunctions(t *testing.T) {
 	}
 
 	var object []interface{}
-	collection := mainSession.DB("test").C("tests")
+	collection := mainSession.Database("test").Collection("tests")
 
 	if _, err := ODataQuery("", testURL.Query(), &object, collection); err != nil {
 		t.Errorf("Error: %s", err.Error())
@@ -80,7 +82,7 @@ func TestODataFunctions(t *testing.T) {
 
 func TestODataFilterGreaterLessThan(t *testing.T) {
 
-	mainSession, err := mgo.Dial(dbhost)
+	mainSession, err := mongo.Connect(context.Background(), options.Client().ApplyURI(dbhost))
 	if err != nil {
 		t.Errorf("Unable to connect to mongo server on %s", dbhost)
 	}
@@ -91,7 +93,7 @@ func TestODataFilterGreaterLessThan(t *testing.T) {
 	}
 
 	var object []interface{}
-	collection := mainSession.DB("test").C("tests")
+	collection := mainSession.Database("test").Collection("tests")
 
 	if _, err := ODataQuery("", testURL.Query(), &object, collection); err != nil {
 		t.Errorf("Error: %s", err.Error())
@@ -121,12 +123,12 @@ func TestODataWithFilter(t *testing.T) {
 		{"", false, errors.New("")},                                        // empty string test
 	}
 
-	mainSession, err := mgo.Dial(dbhost)
+	mainSession, err := mongo.Connect(context.Background(), options.Client().ApplyURI(dbhost))
 	if err != nil {
 		t.Errorf("Unable to connect to mongo server on %s", dbhost)
 	}
 	var object []interface{}
-	collection := mainSession.DB("test").C("tests")
+	collection := mainSession.Database("test").Collection("tests")
 
 	for _, expectedVal := range filterTests {
 		var testURLString = fmt.Sprintf("http://localhost/test?$filter=%s", expectedVal.input)

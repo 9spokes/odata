@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/intel/rsp-sw-toolkit-im-suite-go-odata/parser"
+	"github.com/9spokes/odata/parser"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 )
