@@ -7,15 +7,17 @@
 package mongo
 
 import (
-	"encoding/hex"
+	"context"
 	"net/url"
 	"reflect"
 	"strings"
 
-	"github.com/globalsign/mgo"
-	"github.com/globalsign/mgo/bson"
-	"github.com/intel/rsp-sw-toolkit-im-suite-go-odata/parser"
+	"github.com/9spokes/odata/parser"
 	"github.com/pkg/errors"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // ErrInvalidInput Client errors
@@ -44,8 +46,8 @@ func addConnectionToAndQuery(connectionID string, filterObj bson.M) []bson.M {
 }
 
 // ODataQuery creates a mgo query based on odata parameters
-//nolint :gocyclo
-func ODataQuery(connectionID string, query url.Values, object interface{}, collection *mgo.Collection) (int, error) {
+// nolint :gocyclo
+func ODataQuery(connectionID string, query url.Values, object interface{}, collection *mongo.Collection) (int64, error) {
 
 	// Parse url values
 	queryMap, err := parser.ParseURLValues(query)
@@ -82,24 +84,41 @@ func ODataQuery(connectionID string, query url.Values, object interface{}, colle
 	}
 
 	// Sort
-	var sortFields []string
+	var sortFields bson.D
 	if queryMap[parser.OrderBy] != nil {
 		orderBySlice := queryMap[parser.OrderBy].([]parser.OrderItem)
 		for _, item := range orderBySlice {
+			order := 1 // asc
 			if item.Order == "desc" {
-				item.Field = "-" + item.Field
+				order = -1
 			}
-			sortFields = append(sortFields, item.Field)
+			sortFields = append(sortFields, bson.E{item.Field, order})
 		}
 	}
 
 	// Query
-	odataFunc := collection.Find(filterObj).Select(selectMap).Limit(limit).Skip(skip).Sort(sortFields...).All(object)
-	count, err := collection.Find(filterObj).Count()
+	cur, err := collection.Find(
+		context.Background(),
+		filterObj,
+		options.Find().SetProjection(selectMap),
+		options.Find().SetLimit(int64(limit)),
+		options.Find().SetSkip(int64(skip)),
+		options.Find().SetSort(sortFields),
+	)
 	if err != nil {
 		return 0, err
 	}
-	return count, odataFunc
+
+	if err := cur.All(context.Background(), object); err != nil {
+		return 0, err
+	}
+
+	count, err := collection.CountDocuments(context.Background(), filterObj)
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }
 
 func GetODataQuery(connectionID string, query url.Values) (Query, error) {
@@ -167,11 +186,11 @@ func GetODataQuery(connectionID string, query url.Values) (Query, error) {
 }
 
 // ODataCount runs a collection.Count() function based on $count odata parameter
-func ODataCount(collection *mgo.Collection) (int, error) {
-	return collection.Count()
+func ODataCount(collection *mongo.Collection) (int64, error) {
+	return collection.CountDocuments(context.Background(), bson.M{})
 }
 
-//nolint :gocyclo
+// nolint :gocyclo
 func applyFilter(node *parser.ParseNode) (bson.M, error) {
 
 	filter := make(bson.M)
@@ -213,11 +232,11 @@ func applyFilter(node *parser.ParseNode) (bson.M, error) {
 				if _, ok := node.Children[1].Token.Value.(string); ok {
 					idString = strings.Replace(node.Children[1].Token.Value.(string), "'", "", -1)
 				}
-				decodedString, err := hex.DecodeString(idString)
-				if err != nil || len(decodedString) != 12 {
+				oid, err := primitive.ObjectIDFromHex(idString)
+				if err != nil {
 					return nil, ErrInvalidInput
 				}
-				value = bson.M{"$" + node.Token.Value.(string): bson.ObjectId(decodedString)}
+				value = bson.M{"$" + node.Token.Value.(string): oid}
 			} else {
 				value = bson.M{"$" + node.Token.Value.(string): node.Children[1].Token.Value}
 			}
@@ -273,7 +292,8 @@ func applyFilter(node *parser.ParseNode) (bson.M, error) {
 			}
 			node.Children[1].Token.Value = strings.Replace(node.Children[1].Token.Value.(string), "'", "", -1)
 			//nolint: vet
-			value := bson.RegEx{"^" + node.Children[1].Token.Value.(string), "gi"}
+
+			value := primitive.Regex{Pattern: "^" + node.Children[1].Token.Value.(string), Options: "gi"}
 			filter[node.Children[0].Token.Value.(string)] = value
 
 		case "endswith":
@@ -282,7 +302,7 @@ func applyFilter(node *parser.ParseNode) (bson.M, error) {
 			}
 			node.Children[1].Token.Value = strings.Replace(node.Children[1].Token.Value.(string), "'", "", -1)
 			//nolint: vet
-			value := bson.RegEx{node.Children[1].Token.Value.(string) + "$", "gi"}
+			value := primitive.Regex{Pattern: node.Children[1].Token.Value.(string) + "$", Options: "gi"}
 			filter[node.Children[0].Token.Value.(string)] = value
 
 		case "contains":
@@ -291,7 +311,7 @@ func applyFilter(node *parser.ParseNode) (bson.M, error) {
 			}
 			node.Children[1].Token.Value = strings.Replace(node.Children[1].Token.Value.(string), "'", "", -1)
 			//nolint: vet
-			value := bson.RegEx{node.Children[1].Token.Value.(string), "gi"}
+			value := primitive.Regex{Pattern: node.Children[1].Token.Value.(string), Options: "gi"}
 			filter[node.Children[0].Token.Value.(string)] = value
 
 		}
