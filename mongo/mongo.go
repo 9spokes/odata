@@ -31,23 +31,24 @@ type Query struct {
 	Sort   bson.D
 }
 
-func addConnectionToAndQuery(connectionID string, filterObj bson.M) []bson.M {
+func addConnectionToAndQuery(connectionIDs []string, filterObj bson.M) []bson.M {
 	andFilter, _ := filterObj["$and"].([]bson.M)
-	return append(andFilter, bson.M{
-		"$or": []bson.M{
-			{
-				"connection_id": connectionID,
-			},
-			{
-				"connection": connectionID,
-			},
-		},
-	})
+
+	orQuery := bson.M{"$or": []bson.M{}}
+
+	for _, connection := range connectionIDs {
+		orQuery["$or"] = append(orQuery["$or"].([]bson.M), bson.M{
+			"connection_id": connection,
+		}, bson.M{
+			"connection": connection,
+		})
+	}
+	return append(andFilter, orQuery)
 }
 
 // ODataQuery creates a mgo query based on odata parameters
 // nolint :gocyclo
-func ODataQuery(connectionID string, query url.Values, object interface{}, collection *mongo.Collection) (int64, error) {
+func ODataQuery(connectionIDs []string, query url.Values, object interface{}, collection *mongo.Collection) (int64, error) {
 
 	// Parse url values
 	queryMap, err := parser.ParseURLValues(query)
@@ -67,7 +68,7 @@ func ODataQuery(connectionID string, query url.Values, object interface{}, colle
 			return 0, errors.Wrap(ErrInvalidInput, err.Error())
 		}
 	}
-	filterObj["$and"] = addConnectionToAndQuery(connectionID, filterObj)
+	filterObj["$and"] = addConnectionToAndQuery(connectionIDs, filterObj)
 
 	// Prepare Select
 	selectMap := make(bson.M)
@@ -121,7 +122,7 @@ func ODataQuery(connectionID string, query url.Values, object interface{}, colle
 	return count, nil
 }
 
-func GetODataQuery(connectionID string, query url.Values) (Query, error) {
+func GetODataQuery(connectionIDs []string, query url.Values) (Query, error) {
 
 	var odataQuery Query
 	// Parse url values
@@ -145,7 +146,7 @@ func GetODataQuery(connectionID string, query url.Values) (Query, error) {
 			return odataQuery, errors.Wrap(ErrInvalidInput, err.Error())
 		}
 	}
-	filterObj["$and"] = addConnectionToAndQuery(connectionID, filterObj)
+	filterObj["$and"] = addConnectionToAndQuery(connectionIDs, filterObj)
 
 	odataQuery.Filter = filterObj
 
