@@ -46,9 +46,9 @@ func addConnectionToAndQuery(connectionIDs []string, filterObj bson.M) []bson.M 
 	return append(andFilter, orQuery)
 }
 
-// ODataQuery creates a mgo query based on odata parameters
+// ODataQuery creates a mongo query based on odata parameters
 // nolint :gocyclo
-func ODataQuery(connectionIDs []string, query url.Values, object interface{}, collection *mongo.Collection) (int64, error) {
+func ODataQuery(connectionIDs []string, query url.Values, object interface{}, collection *mongo.Collection, countTotal bool) (int64, error) {
 
 	// Parse url values
 	queryMap, err := parser.ParseURLValues(query)
@@ -114,12 +114,17 @@ func ODataQuery(connectionIDs []string, query url.Values, object interface{}, co
 		return 0, err
 	}
 
-	count, err := collection.CountDocuments(context.Background(), filterObj)
-	if err != nil {
-		return 0, err
+	if !countTotal {
+		// caller didn't ask for the total count of documents,
+		// so don't waste cpu/time asking Mongo, just return 0 instead
+		return 0, nil
+	} else {
+		count, err := collection.CountDocuments(context.Background(), filterObj)
+		if err != nil {
+			return 0, err
+		}
+		return count, nil
 	}
-
-	return count, nil
 }
 
 func GetODataQuery(connectionIDs []string, query url.Values) (Query, error) {
