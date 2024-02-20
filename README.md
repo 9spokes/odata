@@ -37,4 +37,4 @@ EX: http://localhost/test?$filter=contains(Name, 'mno')
 EX:  http://localhost/test?$filter=((num1 gt 0) and (name ne 'abc') and (required eq true) and (count lt 0.1) or (id eq '123') and contains(time, '0') and startswith(code, '456') or "endswith(code, '789'))&top=10...
 
 
-See ODATA specification [https://www.odata.org/](https://www.odata.org/documentation/odata-version-2-0/uri-conventions/)
+See ODATA specification [https://www.odata.org/](https://www.odata.org/documentation/odata-version-2-0/uri-conventions/){:target="_blank"} 
